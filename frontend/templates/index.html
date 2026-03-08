@@ -1,0 +1,772 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Healthcare Anomaly Detection Dashboard</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+
+  <style>
+    :root {
+      --bg:          #f0f4f8;
+      --bg-mid:      #e4ecf5;
+      --surface:     #ffffff;
+      --surface2:    #f7fafd;
+      --border:      #d6e4f0;
+      --blue-vivid:  #1a6fd4;
+      --blue-light:  #e8f2fd;
+      --blue-mid:    #b8d8f8;
+      --green-vivid: #0f9e6e;
+      --green-light: #e0f7f0;
+      --green-mid:   #a7e8d4;
+      --amber-vivid: #d08b00;
+      --amber-light: #fef6e0;
+      --amber-mid:   #fcd97a;
+      --red-vivid:   #d63b3b;
+      --red-light:   #fdeaea;
+      --red-mid:     #f5b3b3;
+      --text-dark:   #0f2237;
+      --text-mid:    #3a5a78;
+      --text-muted:  #7fa0be;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      font-family: 'DM Sans', sans-serif;
+      color: var(--text-dark);
+      min-height: 100vh;
+    }
+
+    .mono { font-family: 'DM Mono', monospace; }
+
+    /* ── Background pattern ── */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        radial-gradient(circle at 15% 15%, rgba(26,111,212,0.07) 0%, transparent 50%),
+        radial-gradient(circle at 85% 80%, rgba(15,158,110,0.06) 0%, transparent 45%),
+        radial-gradient(circle at 60% 10%, rgba(208,139,0,0.04) 0%, transparent 40%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* Dot grid */
+    body::after {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: radial-gradient(circle, rgba(26,111,212,0.12) 1px, transparent 1px);
+      background-size: 28px 28px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    main, header { position: relative; z-index: 1; }
+
+    /* ── Header ── */
+    header {
+      background: rgba(255,255,255,0.88);
+      backdrop-filter: blur(16px);
+      border-bottom: 1.5px solid var(--border);
+      padding: 14px 32px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .logo-icon {
+      width: 36px; height: 36px;
+      background: linear-gradient(135deg, #1a6fd4, #0f9e6e);
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      color: white; font-weight: 700; font-size: 13px;
+      box-shadow: 0 4px 12px rgba(26,111,212,0.25);
+      flex-shrink: 0;
+    }
+
+    .refresh-btn {
+      background: linear-gradient(135deg, #1a6fd4, #1557aa);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      padding: 8px 18px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      font-family: 'DM Sans', sans-serif;
+      box-shadow: 0 3px 10px rgba(26,111,212,0.3);
+      transition: transform 0.15s, box-shadow 0.15s;
+    }
+    .refresh-btn:hover { transform: translateY(-1px); box-shadow: 0 5px 16px rgba(26,111,212,0.4); }
+    .refresh-btn:active { transform: translateY(0); }
+
+    /* ── Stat cards ── */
+    .card {
+      background: var(--surface);
+      border-radius: 16px;
+      border: 1.5px solid var(--border);
+      box-shadow: 0 2px 12px rgba(26,111,212,0.06), 0 1px 3px rgba(0,0,0,0.04);
+      transition: box-shadow 0.2s, transform 0.2s;
+      overflow: hidden;
+    }
+    .card:hover {
+      box-shadow: 0 8px 28px rgba(26,111,212,0.1), 0 2px 8px rgba(0,0,0,0.06);
+      transform: translateY(-1px);
+    }
+
+    .stat-card {
+      padding: 22px 24px;
+    }
+
+    .stat-icon {
+      width: 40px; height: 40px; border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px; margin-bottom: 14px;
+      flex-shrink: 0;
+    }
+
+    .stat-label {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+    }
+
+    .stat-value {
+      font-family: 'DM Mono', monospace;
+      font-size: 36px;
+      font-weight: 500;
+      line-height: 1;
+      margin-bottom: 12px;
+    }
+
+    .progress-track {
+      height: 5px;
+      border-radius: 99px;
+      background: var(--bg-mid);
+      overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%;
+      border-radius: 99px;
+      transition: width 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    /* Stat card themes */
+    .card-blue  { border-top: 3px solid var(--blue-vivid); }
+    .card-green { border-top: 3px solid var(--green-vivid); }
+    .card-amber { border-top: 3px solid var(--amber-vivid); }
+    .card-red   { border-top: 3px solid var(--red-vivid); }
+
+    .icon-blue  { background: var(--blue-light); }
+    .icon-green { background: var(--green-light); }
+    .icon-amber { background: var(--amber-light); }
+    .icon-red   { background: var(--red-light); }
+
+    /* ── Section title ── */
+    .section-title {
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      padding: 16px 20px 0;
+    }
+
+    /* ── Chart cards ── */
+    .chart-pad { padding: 16px 20px 20px; }
+
+    /* ── Table styling ── */
+    table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+    thead tr { background: var(--surface2); border-bottom: 1.5px solid var(--border); }
+    th { padding: 10px 16px; text-align: left; font-size: 11px; font-weight: 600;
+         letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); }
+    th:not(:first-child) { text-align: right; }
+    tbody tr { border-bottom: 1px solid #edf2f7; transition: background 0.12s; }
+    tbody tr:hover { background: var(--surface2); }
+    td { padding: 9px 16px; color: var(--text-mid); }
+    td:not(:first-child) { text-align: right; }
+
+    /* ── Badge ── */
+    .badge {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 99px;
+      font-size: 10.5px;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+    }
+    .badge-low    { background: var(--green-light); color: var(--green-vivid); }
+    .badge-medium { background: var(--amber-light); color: var(--amber-vivid); }
+    .badge-high   { background: var(--red-light);   color: var(--red-vivid); }
+
+    /* ── Alert cards ── */
+    .alert-card {
+      background: var(--red-light);
+      border: 1.5px solid var(--red-mid);
+      border-radius: 12px;
+      padding: 12px 14px;
+      margin-bottom: 8px;
+      animation: slideIn 0.3s ease-out;
+    }
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateY(-6px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ── Live dot ── */
+    .live-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--green-vivid);
+      position: relative;
+      display: inline-block;
+    }
+    .live-dot::after {
+      content: '';
+      position: absolute;
+      inset: -3px;
+      border-radius: 50%;
+      border: 2px solid var(--green-vivid);
+      opacity: 0;
+      animation: ping 1.5s ease-out infinite;
+    }
+    @keyframes ping {
+      0%   { opacity: 0.8; transform: scale(0.8); }
+      100% { opacity: 0;   transform: scale(2); }
+    }
+
+    /* ── HIGH flash ── */
+    @keyframes flash-border {
+      0%, 100% { border-top-color: var(--red-vivid); box-shadow: 0 2px 12px rgba(214,59,59,0.06); }
+      50%       { border-top-color: #ff6b6b; box-shadow: 0 0 24px rgba(214,59,59,0.18); }
+    }
+    .high-flash { animation: flash-border 1.8s ease-in-out infinite; }
+
+    /* ── Filter buttons ── */
+    .filter-btn {
+      font-size: 12px; padding: 5px 14px;
+      border-radius: 8px; border: 1.5px solid var(--border);
+      background: white; color: var(--text-mid);
+      cursor: pointer; font-family: 'DM Sans', sans-serif;
+      font-weight: 500; transition: all 0.15s;
+    }
+    .filter-btn:hover { border-color: var(--blue-vivid); color: var(--blue-vivid); }
+    .filter-btn.active { background: var(--blue-vivid); color: white; border-color: var(--blue-vivid); }
+
+    /* ── Scrollbar ── */
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--blue-mid); border-radius: 99px; }
+
+    /* ── Card header ── */
+    .card-header {
+      padding: 14px 20px;
+      border-bottom: 1.5px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--surface2);
+    }
+    .card-header-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-dark);
+    }
+    .card-header-sub {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    /* ── Mini metric pill ── */
+    .metric-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      background: var(--blue-light);
+      border: 1px solid var(--blue-mid);
+      border-radius: 99px;
+      padding: 3px 10px;
+      font-size: 11px;
+      color: var(--blue-vivid);
+      font-weight: 500;
+    }
+
+    /* ── Gauge bar for alerts ── */
+    .score-bar-track {
+      height: 4px; border-radius: 99px;
+      background: var(--red-mid);
+      overflow: hidden; margin-top: 6px;
+    }
+    .score-bar-fill {
+      height: 100%; border-radius: 99px;
+      background: var(--red-vivid);
+    }
+
+    /* ── Card enter animation ── */
+    @keyframes cardIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .card { animation: cardIn 0.4s ease-out both; }
+    .card:nth-child(1) { animation-delay: 0.05s; }
+    .card:nth-child(2) { animation-delay: 0.10s; }
+    .card:nth-child(3) { animation-delay: 0.15s; }
+    .card:nth-child(4) { animation-delay: 0.20s; }
+
+    /* ── Watermark decoration ── */
+    .deco-ring {
+      position: absolute;
+      border-radius: 50%;
+      border: 1.5px solid rgba(26,111,212,0.10);
+      pointer-events: none;
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- ══ HEADER ══════════════════════════════════════════════════════════════ -->
+  <header>
+    <div style="display:flex;align-items:center;gap:12px;">
+      <div class="logo-icon">HC</div>
+      <div>
+        <div style="font-size:15px;font-weight:700;color:var(--text-dark);letter-spacing:-0.01em;">Healthcare Anomaly Detection</div>
+        <div style="font-size:12px;color:var(--text-muted);">Real-time Patient Monitoring System</div>
+      </div>
+    </div>
+
+    <div style="display:flex;align-items:center;gap:16px;">
+      <div style="display:flex;align-items:center;gap:7px;">
+        <span class="live-dot"></span>
+        <span style="font-size:12px;font-weight:600;color:var(--green-vivid);font-family:'DM Mono',monospace;">LIVE</span>
+      </div>
+      <span id="last-updated" style="font-size:12px;color:var(--text-muted);font-family:'DM Mono',monospace;">—</span>
+      <button onclick="fetchAll()" class="refresh-btn">↻ Refresh</button>
+    </div>
+  </header>
+
+
+  <!-- ══ MAIN ════════════════════════════════════════════════════════════════ -->
+  <main style="max-width:1280px;margin:0 auto;padding:28px 28px 48px;display:flex;flex-direction:column;gap:20px;">
+
+    <!-- ── ROW 1: Stat Cards ─────────────────────────────────────────── -->
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;">
+
+      <!-- Total -->
+      <div class="card card-blue stat-card">
+        <div class="stat-icon icon-blue">📊</div>
+        <div class="stat-label">Total Processed</div>
+        <div class="stat-value mono" id="stat-total" style="color:var(--blue-vivid);">—</div>
+        <div style="font-size:11px;color:var(--text-muted);">vital sign records</div>
+      </div>
+
+      <!-- LOW -->
+      <div class="card card-green stat-card">
+        <div class="stat-icon icon-green">✅</div>
+        <div class="stat-label">Low Severity</div>
+        <div class="stat-value mono" id="stat-low" style="color:var(--green-vivid);">—</div>
+        <div class="progress-track">
+          <div class="progress-fill" id="bar-low" style="width:0%;background:var(--green-vivid);"></div>
+        </div>
+      </div>
+
+      <!-- MEDIUM -->
+      <div class="card card-amber stat-card">
+        <div class="stat-icon icon-amber">⚠️</div>
+        <div class="stat-label">Medium Severity</div>
+        <div class="stat-value mono" id="stat-medium" style="color:var(--amber-vivid);">—</div>
+        <div class="progress-track">
+          <div class="progress-fill" id="bar-medium" style="width:0%;background:var(--amber-vivid);"></div>
+        </div>
+      </div>
+
+      <!-- HIGH -->
+      <div class="card card-red stat-card" id="high-card">
+        <div class="stat-icon icon-red">🚨</div>
+        <div class="stat-label">High Severity</div>
+        <div class="stat-value mono" id="stat-high" style="color:var(--red-vivid);">—</div>
+        <div class="progress-track">
+          <div class="progress-fill" id="bar-high" style="width:0%;background:var(--red-vivid);"></div>
+        </div>
+      </div>
+    </div>
+
+
+    <!-- ── ROW 2: Charts ─────────────────────────────────────────────── -->
+    <div style="display:grid;grid-template-columns:1fr 2fr;gap:16px;">
+
+      <!-- Donut -->
+      <div class="card" style="display:flex;flex-direction:column;">
+        <div class="section-title">Severity Distribution</div>
+        <div class="chart-pad" style="flex:1;display:flex;align-items:center;justify-content:center;">
+          <canvas id="donut-chart" style="max-height:210px;"></canvas>
+        </div>
+      </div>
+
+      <!-- Trend line -->
+      <div class="card" style="display:flex;flex-direction:column;">
+        <div style="padding:16px 20px 0;display:flex;align-items:center;justify-content:space-between;">
+          <div class="section-title" style="padding:0;">Anomaly Score Trend</div>
+          <span class="metric-pill">Last 20 records</span>
+        </div>
+        <div class="chart-pad" style="flex:1;">
+          <canvas id="trend-chart" style="max-height:210px;"></canvas>
+        </div>
+      </div>
+    </div>
+
+
+    <!-- ── ROW 3: Live Vitals + Alerts ──────────────────────────────── -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+
+      <!-- Vitals table -->
+      <div class="card" style="overflow:hidden;">
+        <div class="card-header">
+          <span class="card-header-title">💓 Live Vital Signs</span>
+          <span class="card-header-sub">Latest 15 records</span>
+        </div>
+        <div style="overflow-y:auto;max-height:320px;">
+          <table>
+            <thead>
+              <tr>
+                <th>Patient</th>
+                <th>HR</th>
+                <th>SpO₂</th>
+                <th>Temp</th>
+                <th>SBP/DBP</th>
+              </tr>
+            </thead>
+            <tbody id="vitals-table-body">
+              <tr><td colspan="5" style="text-align:center;padding:32px;color:var(--text-muted);">Loading...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Alerts -->
+      <div class="card" style="overflow:hidden;">
+        <div class="card-header">
+          <span class="card-header-title">🚨 Critical Alerts</span>
+          <span class="card-header-sub">HIGH severity only</span>
+        </div>
+        <div id="alerts-panel" style="overflow-y:auto;max-height:320px;padding:12px;">
+          <p style="text-align:center;color:var(--text-muted);font-size:12px;padding:32px 0;">No critical alerts 🟢</p>
+        </div>
+      </div>
+    </div>
+
+
+    <!-- ── ROW 4: Anomaly Log ────────────────────────────────────────── -->
+    <div class="card" style="overflow:hidden;">
+      <div class="card-header">
+        <span class="card-header-title">🔍 Anomaly Detection Log</span>
+        <div style="display:flex;gap:6px;">
+          <button onclick="filterAnomalies('ALL')"    id="btn-all"    class="filter-btn active">All</button>
+          <button onclick="filterAnomalies('HIGH')"   id="btn-high"   class="filter-btn">HIGH</button>
+          <button onclick="filterAnomalies('MEDIUM')" id="btn-medium" class="filter-btn">MEDIUM</button>
+          <button onclick="filterAnomalies('LOW')"    id="btn-low"    class="filter-btn">LOW</button>
+        </div>
+      </div>
+      <div style="overflow:auto;max-height:380px;">
+        <table>
+          <thead>
+            <tr>
+              <th>Patient</th>
+              <th style="text-align:left;">Severity</th>
+              <th>Combined Score</th>
+              <th>IF Score</th>
+              <th>AE Score</th>
+              <th>HR</th>
+              <th>SpO₂</th>
+              <th>Detected At</th>
+            </tr>
+          </thead>
+          <tbody id="anomaly-table-body">
+            <tr><td colspan="8" style="text-align:center;padding:32px;color:var(--text-muted);">Loading...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </main>
+
+
+  <!-- ══ JAVASCRIPT ══════════════════════════════════════════════════════════ -->
+  <script>
+    const API = '';
+    const REFRESH_INTERVAL_MS = 5000;
+    let allAnomalies = [];
+    let donutChart = null;
+    let trendChart = null;
+
+    // ── Charts ──────────────────────────────────────────────────────────────
+
+    function initDonutChart() {
+      const ctx = document.getElementById('donut-chart').getContext('2d');
+      donutChart = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+          labels: ['Low', 'Medium', 'High'],
+          datasets: [{
+            data: [0, 0, 0],
+            backgroundColor: ['rgba(15,158,110,0.75)', 'rgba(208,139,0,0.75)', 'rgba(214,59,59,0.75)'],
+            borderColor:     ['#0f9e6e', '#d08b00', '#d63b3b'],
+            borderWidth: 2,
+            hoverOffset: 6,
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: true,
+          plugins: {
+            legend: {
+              labels: { color: '#3a5a78', font: { size: 12, family: 'DM Sans' }, padding: 16 }
+            }
+          },
+          cutout: '68%',
+        }
+      });
+    }
+
+    function initTrendChart() {
+      const ctx = document.getElementById('trend-chart').getContext('2d');
+      trendChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: [],
+          datasets: [{
+            label: 'Anomaly Score',
+            data: [],
+            borderColor: '#1a6fd4',
+            backgroundColor: (ctx) => {
+              const gradient = ctx.chart.ctx.createLinearGradient(0, 0, 0, 200);
+              gradient.addColorStop(0, 'rgba(26,111,212,0.18)');
+              gradient.addColorStop(1, 'rgba(26,111,212,0.01)');
+              return gradient;
+            },
+            tension: 0.4,
+            fill: true,
+            pointRadius: 4,
+            pointBackgroundColor: '#ffffff',
+            pointBorderColor: '#1a6fd4',
+            pointBorderWidth: 2,
+            pointHoverRadius: 6,
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            x: {
+              ticks: { color: '#7fa0be', font: { size: 10, family: 'DM Mono' }, maxTicksLimit: 8 },
+              grid:  { color: 'rgba(26,111,212,0.06)' },
+              border: { color: 'rgba(26,111,212,0.12)' },
+            },
+            y: {
+              min: 0, max: 1,
+              ticks: { color: '#7fa0be', font: { size: 10, family: 'DM Mono' } },
+              grid:  { color: 'rgba(26,111,212,0.06)' },
+              border: { color: 'rgba(26,111,212,0.12)' },
+            }
+          },
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              backgroundColor: 'white',
+              titleColor: '#0f2237',
+              bodyColor: '#3a5a78',
+              borderColor: '#d6e4f0',
+              borderWidth: 1.5,
+              padding: 10,
+              boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+            }
+          }
+        }
+      });
+    }
+
+    // ── Fetch ────────────────────────────────────────────────────────────────
+
+    async function fetchStats() {
+      try {
+        const res  = await fetch(`${API}/api/stats`);
+        const json = await res.json();
+        if (!json.success) return;
+
+        const sc    = json.severity_counts;
+        const total = sc.LOW + sc.MEDIUM + sc.HIGH || 1;
+
+        document.getElementById('stat-total').textContent  = json.total_vitals.toLocaleString();
+        document.getElementById('stat-low').textContent    = sc.LOW.toLocaleString();
+        document.getElementById('stat-medium').textContent = sc.MEDIUM.toLocaleString();
+        document.getElementById('stat-high').textContent   = sc.HIGH.toLocaleString();
+
+        document.getElementById('bar-low').style.width    = `${(sc.LOW   / total * 100).toFixed(1)}%`;
+        document.getElementById('bar-medium').style.width = `${(sc.MEDIUM/ total * 100).toFixed(1)}%`;
+        document.getElementById('bar-high').style.width   = `${(sc.HIGH  / total * 100).toFixed(1)}%`;
+
+        const highCard = document.getElementById('high-card');
+        if (sc.HIGH > 0) highCard.classList.add('high-flash');
+        else             highCard.classList.remove('high-flash');
+
+        donutChart.data.datasets[0].data = [sc.LOW, sc.MEDIUM, sc.HIGH];
+        donutChart.update();
+
+        const trend = [...json.trend].reverse();
+        trendChart.data.labels              = trend.map((_, i) => `#${i+1}`);
+        trendChart.data.datasets[0].data    = trend.map(r => r.combined_score);
+        trendChart.update();
+
+        renderAlerts(json.high_alerts);
+      } catch(e) { console.error('fetchStats error:', e); }
+    }
+
+    async function fetchVitals() {
+      try {
+        const res  = await fetch(`${API}/api/vitals?limit=15`);
+        const json = await res.json();
+        if (!json.success) return;
+        renderVitalsTable(json.data);
+      } catch(e) { console.error('fetchVitals error:', e); }
+    }
+
+    async function fetchAnomalies(severity = 'ALL') {
+      try {
+        const url = severity === 'ALL'
+          ? `${API}/api/anomalies?limit=50`
+          : `${API}/api/anomalies?limit=50&severity=${severity}`;
+        const res  = await fetch(url);
+        const json = await res.json();
+        if (!json.success) return;
+        allAnomalies = json.data;
+        renderAnomalyTable(json.data);
+      } catch(e) { console.error('fetchAnomalies error:', e); }
+    }
+
+    // ── Render ───────────────────────────────────────────────────────────────
+
+    function severityBadge(s) {
+      const cls = { LOW: 'badge-low', MEDIUM: 'badge-medium', HIGH: 'badge-high' }[s] || '';
+      return `<span class="badge ${cls}">${s}</span>`;
+    }
+
+    function scoreColor(score) {
+      if (score > 0.7) return 'color:var(--red-vivid);font-weight:600;';
+      if (score > 0.4) return 'color:var(--amber-vivid);font-weight:600;';
+      return 'color:var(--green-vivid);font-weight:600;';
+    }
+
+    function renderVitalsTable(rows) {
+      const tbody = document.getElementById('vitals-table-body');
+      if (!rows.length) {
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:32px;color:var(--text-muted);">No data yet — start the Kafka producer</td></tr>';
+        return;
+      }
+      tbody.innerHTML = rows.map(r => `
+        <tr>
+          <td style="font-family:'DM Mono',monospace;font-weight:500;color:var(--text-dark);">#${r.patient_id}</td>
+          <td style="font-family:'DM Mono',monospace;color:${r.heart_rate > 100 || r.heart_rate < 60 ? 'var(--red-vivid)' : 'var(--green-vivid)'};">${r.heart_rate}</td>
+          <td style="font-family:'DM Mono',monospace;color:${r.spo2 < 95 ? 'var(--red-vivid)' : 'var(--green-vivid)'};">${r.spo2?.toFixed(1)}%</td>
+          <td style="font-family:'DM Mono',monospace;color:${r.body_temperature > 38.5 ? 'var(--amber-vivid)' : 'var(--text-mid)'};">${r.body_temperature?.toFixed(1)}°</td>
+          <td style="font-family:'DM Mono',monospace;color:var(--text-mid);">${r.systolic_bp}/${r.diastolic_bp}</td>
+        </tr>
+      `).join('');
+    }
+
+    function renderAnomalyTable(rows) {
+      const tbody = document.getElementById('anomaly-table-body');
+      if (!rows.length) {
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:32px;color:var(--text-muted);">No anomalies detected yet</td></tr>';
+        return;
+      }
+      tbody.innerHTML = rows.map(r => `
+        <tr>
+          <td style="font-family:'DM Mono',monospace;font-weight:500;color:var(--text-dark);">#${r.patient_id}</td>
+          <td>${severityBadge(r.severity)}</td>
+          <td style="font-family:'DM Mono',monospace;text-align:right;${scoreColor(r.combined_score)}">${r.combined_score?.toFixed(3)}</td>
+          <td style="font-family:'DM Mono',monospace;color:var(--text-muted);">${r.isolation_forest_score?.toFixed(3)}</td>
+          <td style="font-family:'DM Mono',monospace;color:var(--text-muted);">${r.autoencoder_score?.toFixed(3)}</td>
+          <td style="font-family:'DM Mono',monospace;color:${r.heart_rate > 100 ? 'var(--red-vivid)' : 'var(--text-mid)'};">${r.heart_rate}</td>
+          <td style="font-family:'DM Mono',monospace;color:${r.spo2 < 95 ? 'var(--red-vivid)' : 'var(--text-mid)'};">${r.spo2?.toFixed(1)}%</td>
+          <td style="font-family:'DM Mono',monospace;color:var(--text-muted);">${formatTime(r.detected_at)}</td>
+        </tr>
+      `).join('');
+    }
+
+    function renderAlerts(alerts) {
+      const panel = document.getElementById('alerts-panel');
+      if (!alerts.length) {
+        panel.innerHTML = '<p style="text-align:center;color:var(--text-muted);font-size:12px;padding:32px 0;">No critical alerts 🟢</p>';
+        return;
+      }
+      panel.innerHTML = alerts.map(a => `
+        <div class="alert-card">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+            <span style="font-family:'DM Mono',monospace;font-size:12.5px;font-weight:600;color:var(--red-vivid);">Patient #${a.patient_id}</span>
+            <span class="badge badge-high">HIGH</span>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;font-size:12px;">
+            <span style="color:var(--text-mid);">HR: <strong style="color:var(--red-vivid);font-family:'DM Mono',monospace;">${a.heart_rate}</strong></span>
+            <span style="color:var(--text-mid);">SpO₂: <strong style="color:var(--red-vivid);font-family:'DM Mono',monospace;">${a.spo2?.toFixed(1)}%</strong></span>
+            <span style="color:var(--text-mid);">Temp: <strong style="color:var(--red-vivid);font-family:'DM Mono',monospace;">${a.body_temperature?.toFixed(1)}°</strong></span>
+          </div>
+          <div class="score-bar-track">
+            <div class="score-bar-fill" style="width:${Math.min(a.combined_score*100,100).toFixed(0)}%"></div>
+          </div>
+          <div style="font-size:10.5px;color:var(--text-muted);margin-top:5px;font-family:'DM Mono',monospace;">Score: ${a.combined_score?.toFixed(3)} · ${formatTime(a.detected_at)}</div>
+        </div>
+      `).join('');
+    }
+
+    // ── Filters ──────────────────────────────────────────────────────────────
+
+    function filterAnomalies(severity) {
+      ['all','high','medium','low'].forEach(s => {
+        const btn = document.getElementById(`btn-${s}`);
+        if (s === severity.toLowerCase()) btn.classList.add('active');
+        else btn.classList.remove('active');
+      });
+      fetchAnomalies(severity);
+    }
+
+    // ── Utils ────────────────────────────────────────────────────────────────
+
+    function formatTime(isoStr) {
+      if (!isoStr) return '—';
+      return new Date(isoStr).toLocaleTimeString([], { hour:'2-digit', minute:'2-digit', second:'2-digit' });
+    }
+
+    function updateTimestamp() {
+      document.getElementById('last-updated').textContent = 'Updated ' + new Date().toLocaleTimeString();
+    }
+
+    async function fetchAll() {
+      await Promise.all([fetchStats(), fetchVitals(), fetchAnomalies()]);
+      updateTimestamp();
+    }
+
+    // ── Init ─────────────────────────────────────────────────────────────────
+
+    document.addEventListener('DOMContentLoaded', () => {
+      initDonutChart();
+      initTrendChart();
+      fetchAll();
+      setInterval(fetchAll, REFRESH_INTERVAL_MS);
+    });
+  </script>
+
+</body>
+</html>
